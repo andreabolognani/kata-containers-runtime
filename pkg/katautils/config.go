@@ -51,6 +51,7 @@ const (
 	firecrackerHypervisorTableType = "firecracker"
 	clhHypervisorTableType         = "clh"
 	qemuHypervisorTableType        = "qemu"
+	libvirtHypervisorTableType     = "libvirt"
 	acrnHypervisorTableType        = "acrn"
 
 	// supported proxy component types
@@ -666,6 +667,110 @@ func newQemuHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	}, nil
 }
 
+func newLibvirtHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
+	hypervisor, err := h.path()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	kernel, err := h.kernel()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	initrd, image, err := h.getInitrdAndImage()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	if image != "" && initrd != "" {
+		return vc.HypervisorConfig{},
+			errors.New("having both an image and an initrd defined in the configuration file is not supported")
+	}
+
+	if image == "" && initrd == "" {
+		return vc.HypervisorConfig{},
+			errors.New("either image or initrd must be defined in the configuration file")
+	}
+
+	firmware, err := h.firmware()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	machineAccelerators := h.machineAccelerators()
+	kernelParams := h.kernelParams()
+	machineType := h.machineType()
+
+	blockDriver, err := h.blockDeviceDriver()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	sharedFS, err := h.sharedFS()
+	if err != nil {
+		return vc.HypervisorConfig{}, err
+	}
+
+	if sharedFS == config.VirtioFS && h.VirtioFSDaemon == "" {
+		return vc.HypervisorConfig{},
+			errors.New("cannot enable virtio-fs without daemon path in configuration file")
+	}
+
+	useVSock := false
+	if h.useVSock() {
+		if utils.SupportsVsocks() {
+			kataUtilsLogger.Info("vsock supported")
+			useVSock = true
+		} else {
+			kataUtilsLogger.Warn("No vsock support, falling back to legacy serial port")
+		}
+	}
+
+	return vc.HypervisorConfig{
+		HypervisorPath:          hypervisor,
+		KernelPath:              kernel,
+		InitrdPath:              initrd,
+		ImagePath:               image,
+		FirmwarePath:            firmware,
+		MachineAccelerators:     machineAccelerators,
+		KernelParams:            vc.DeserializeParams(strings.Fields(kernelParams)),
+		HypervisorMachineType:   machineType,
+		NumVCPUs:                h.defaultVCPUs(),
+		DefaultMaxVCPUs:         h.defaultMaxVCPUs(),
+		MemorySize:              h.defaultMemSz(),
+		MemSlots:                h.defaultMemSlots(),
+		MemOffset:               h.defaultMemOffset(),
+		VirtioMem:               h.VirtioMem,
+		EntropySource:           h.GetEntropySource(),
+		DefaultBridges:          h.defaultBridges(),
+		DisableBlockDeviceUse:   h.DisableBlockDeviceUse,
+		SharedFS:                sharedFS,
+		VirtioFSDaemon:          h.VirtioFSDaemon,
+		VirtioFSCacheSize:       h.VirtioFSCacheSize,
+		VirtioFSCache:           h.defaultVirtioFSCache(),
+		VirtioFSExtraArgs:       h.VirtioFSExtraArgs,
+		MemPrealloc:             h.MemPrealloc,
+		HugePages:               h.HugePages,
+		FileBackedMemRootDir:    h.FileBackedMemRootDir,
+		Mlock:                   !h.Swap,
+		Debug:                   h.Debug,
+		DisableNestingChecks:    h.DisableNestingChecks,
+		BlockDeviceDriver:       blockDriver,
+		BlockDeviceCacheSet:     h.BlockDeviceCacheSet,
+		BlockDeviceCacheDirect:  h.BlockDeviceCacheDirect,
+		BlockDeviceCacheNoflush: h.BlockDeviceCacheNoflush,
+		EnableIOThreads:         h.EnableIOThreads,
+		Msize9p:                 h.msize9p(),
+		UseVSock:                useVSock,
+		DisableImageNvdimm:      h.DisableImageNvdimm,
+		HotplugVFIOOnRootBus:    h.HotplugVFIOOnRootBus,
+		PCIeRootPort:            h.PCIeRootPort,
+		DisableVhostNet:         h.DisableVhostNet,
+		GuestHookPath:           h.guestHookPath(),
+	}, nil
+}
+
 func newAcrnHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 	hypervisor, err := h.path()
 	if err != nil {
@@ -855,6 +960,9 @@ func updateRuntimeConfigHypervisor(configPath string, tomlConf tomlConfig, confi
 		case qemuHypervisorTableType:
 			config.HypervisorType = vc.QemuHypervisor
 			hConfig, err = newQemuHypervisorConfig(hypervisor)
+		case libvirtHypervisorTableType:
+			config.HypervisorType = vc.LibvirtHypervisor
+			hConfig, err = newLibvirtHypervisorConfig(hypervisor)
 		case acrnHypervisorTableType:
 			config.HypervisorType = vc.AcrnHypervisor
 			hConfig, err = newAcrnHypervisorConfig(hypervisor)
