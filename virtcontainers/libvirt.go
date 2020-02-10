@@ -16,6 +16,7 @@ import (
 
 type libvirt struct {
 	id     string
+	store  persistapi.PersistDriver
 	config *HypervisorConfig
 }
 

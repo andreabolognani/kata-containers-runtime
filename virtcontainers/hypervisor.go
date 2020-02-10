@@ -39,6 +39,9 @@ const (
 	// QemuHypervisor is the QEMU hypervisor.
 	QemuHypervisor HypervisorType = "qemu"
 
+	// LibvirtHypervisor is the QEMU hypervisor run via libvirt.
+	LibvirtHypervisor HypervisorType = "libvirt"
+
 	// AcrnHypervisor is the ACRN hypervisor.
 	AcrnHypervisor HypervisorType = "acrn"
 
@@ -156,6 +159,9 @@ func (hType *HypervisorType) Set(value string) error {
 	case "qemu":
 		*hType = QemuHypervisor
 		return nil
+	case "libvirt":
+		*hType = LibvirtHypervisor
+		return nil
 	case "firecracker":
 		*hType = FirecrackerHypervisor
 		return nil
@@ -178,6 +184,8 @@ func (hType *HypervisorType) String() string {
 	switch *hType {
 	case QemuHypervisor:
 		return string(QemuHypervisor)
+	case LibvirtHypervisor:
+		return string(LibvirtHypervisor)
 	case FirecrackerHypervisor:
 		return string(FirecrackerHypervisor)
 	case AcrnHypervisor:
@@ -201,6 +209,10 @@ func newHypervisor(hType HypervisorType) (hypervisor, error) {
 	switch hType {
 	case QemuHypervisor:
 		return &qemu{
+			store: store,
+		}, nil
+	case LibvirtHypervisor:
+		return &libvirt{
 			store: store,
 		}, nil
 	case FirecrackerHypervisor:
