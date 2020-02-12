@@ -167,7 +167,12 @@ func (v *libvirt) generateSocket(id string, useVsock bool) (interface{}, error) 
 	l := v.funcLogger("generateSocket")
 	l.WithField("id", id).WithField("useVsock", useVsock).Debug()
 
-	return nil, errors.New("generateSocket() failed")
+	sock, err := generateVMSocket(id, useVsock, v.store.RunVMStoragePath())
+	if err == nil {
+		l.WithField("sock", sock).Debug()
+	}
+
+	return sock, err
 }
 
 // vim: set noexpandtab :
