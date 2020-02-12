@@ -8,11 +8,13 @@ package virtcontainers
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	persistapi "github.com/kata-containers/runtime/virtcontainers/persist/api"
 	"github.com/kata-containers/runtime/virtcontainers/types"
 	"github.com/kata-containers/runtime/virtcontainers/utils"
 	"github.com/sirupsen/logrus"
+	virtxml "libvirt.org/libvirt-go-xml"
 )
 
 const (
@@ -20,9 +22,10 @@ const (
 )
 
 type libvirt struct {
-	id     string
-	store  persistapi.PersistDriver
-	config *HypervisorConfig
+	id            string
+	store         persistapi.PersistDriver
+	config        *HypervisorConfig
+	libvirtConfig *virtxml.Domain
 }
 
 func (v *libvirt) logger() *logrus.Entry {
@@ -53,6 +56,91 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 	err := v.config.valid()
 	if err != nil {
 		return err
+	}
+
+	consolePath, err := v.getSandboxConsole(id)
+	if err != nil {
+		return err
+	}
+
+	v.libvirtConfig = &virtxml.Domain{
+		Type: "kvm",
+		Name: fmt.Sprintf("sandbox-%s", id),
+		VCPU: &virtxml.DomainVCPU{
+			Current: fmt.Sprintf("%d", v.config.NumVCPUs),
+			Value:   int(v.config.DefaultMaxVCPUs),
+		},
+		Memory: &virtxml.DomainMemory{
+			Unit:  "MiB",
+			Value: uint(v.config.MemorySize),
+		},
+		OS: &virtxml.DomainOS{
+			Type: &virtxml.DomainOSType{
+				Type:    "hvm",
+				Machine: v.config.HypervisorMachineType,
+			},
+			Kernel: v.config.KernelPath,
+			Initrd: v.config.InitrdPath,
+		},
+		Features: &virtxml.DomainFeatureList{
+			ACPI: &virtxml.DomainFeature{},
+			APIC: &virtxml.DomainFeatureAPIC{},
+			IOAPIC: &virtxml.DomainFeatureIOAPIC{
+				Driver: "kvm",
+			},
+			PMU: &virtxml.DomainFeatureState{
+				State: "off",
+			},
+		},
+		CPU: &virtxml.DomainCPU{
+			Mode: "host-passthrough",
+		},
+		Clock: &virtxml.DomainClock{
+			Timer: []virtxml.DomainTimer{
+				virtxml.DomainTimer{
+					Name:       "pit",
+					TickPolicy: "discard",
+				},
+			},
+		},
+		Devices: &virtxml.DomainDeviceList{
+			Emulator: v.config.HypervisorPath,
+			Consoles: []virtxml.DomainConsole{
+				virtxml.DomainConsole{
+					Source: &virtxml.DomainChardevSource{
+						UNIX: &virtxml.DomainChardevSourceUNIX{
+							Mode: "bind",
+							Path: consolePath,
+						},
+					},
+					Target: &virtxml.DomainConsoleTarget{
+						Type: "virtio",
+					},
+				},
+			},
+			Controllers: []virtxml.DomainController{
+				virtxml.DomainController{
+					Type:  "usb",
+					Model: "none",
+				},
+			},
+			MemBalloon: &virtxml.DomainMemBalloon{
+				Model: "none",
+			},
+			RNGs: []virtxml.DomainRNG{
+				virtxml.DomainRNG{
+					Model: "virtio",
+					Backend: &virtxml.DomainRNGBackend{
+						Random: &virtxml.DomainRNGBackendRandom{
+							Device: "/dev/urandom",
+						},
+					},
+				},
+			},
+			Channels:    []virtxml.DomainChannel{},
+			Filesystems: []virtxml.DomainFilesystem{},
+			Interfaces:  []virtxml.DomainInterface{},
+		},
 	}
 
 	return nil
