@@ -212,7 +212,7 @@ func (v *libvirt) addDevice(devInfo interface{}, devType deviceType) error {
 	l := v.funcLogger("addDevice")
 	l.WithField("devInfo", devInfo).WithField("devType", devType).Debug()
 
-	return errors.New("addDevice() failed")
+	return nil
 }
 
 func (v *libvirt) hotplugAddDevice(devInfo interface{}, devType deviceType) (interface{}, error) {
