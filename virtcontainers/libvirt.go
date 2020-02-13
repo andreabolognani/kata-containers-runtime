@@ -212,6 +212,26 @@ func (v *libvirt) addDevice(devInfo interface{}, devType deviceType) error {
 	l := v.funcLogger("addDevice")
 	l.WithField("devInfo", devInfo).WithField("devType", devType).Debug()
 
+	switch dev := devInfo.(type) {
+	case types.Socket:
+		sock := &virtxml.DomainChannel{
+			Source: &virtxml.DomainChardevSource{
+				UNIX: &virtxml.DomainChardevSourceUNIX{
+					Mode: "bind",
+					Path: dev.HostPath,
+				},
+			},
+			Target: &virtxml.DomainChannelTarget{
+				VirtIO: &virtxml.DomainChannelTargetVirtIO{
+					Name: dev.Name,
+				},
+			},
+		}
+		v.libvirtConfig.Devices.Channels = append(v.libvirtConfig.Devices.Channels, *sock)
+	default:
+		break
+	}
+
 	return nil
 }
 
