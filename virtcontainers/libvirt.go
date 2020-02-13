@@ -16,6 +16,7 @@ import (
 	"github.com/kata-containers/runtime/virtcontainers/types"
 	"github.com/kata-containers/runtime/virtcontainers/utils"
 	"github.com/sirupsen/logrus"
+	virt "libvirt.org/libvirt-go"
 	virtxml "libvirt.org/libvirt-go-xml"
 )
 
@@ -204,7 +205,30 @@ func (v *libvirt) startSandbox(timeout int) error {
 	l := v.funcLogger("startSandbox")
 	l.WithField("timeout", timeout).Debug()
 
-	return errors.New("startSandbox() failed")
+	domXML, err := v.libvirtConfig.Marshal()
+	if err != nil {
+		return err
+	}
+
+	l.WithField("domXML", domXML).Debug()
+
+	conn, err := virt.NewConnect(v.libvirtURI)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	l.Debug("connected")
+
+	dom, err := conn.DomainDefineXML(domXML)
+	if err != nil {
+		return err
+	}
+	defer dom.Free()
+
+	l.Debug("domain defined")
+
+	return nil
 }
 
 func (v *libvirt) stopSandbox() error {
