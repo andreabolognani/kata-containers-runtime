@@ -256,6 +256,13 @@ func (v *libvirt) startSandbox(timeout int) error {
 
 	l.Debug("domain defined")
 
+	err = dom.Create()
+	if err != nil {
+		return err
+	}
+
+	l.Debug("domain created")
+
 	return nil
 }
 
@@ -278,6 +285,13 @@ func (v *libvirt) stopSandbox() error {
 	defer dom.Free()
 
 	l.Debug("domain found")
+
+	err = dom.Destroy()
+	if err == nil {
+		l.Debug("domain destroyed")
+	} else {
+		l.Debug("failed to destroy domain")
+	}
 
 	err = dom.Undefine()
 	if err != nil {
