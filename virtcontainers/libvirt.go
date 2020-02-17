@@ -235,7 +235,30 @@ func (v *libvirt) stopSandbox() error {
 	l := v.funcLogger("stopSandbox")
 	l.Debug()
 
-	return errors.New("stopSandbox() failed")
+	conn, err := virt.NewConnect(v.libvirtURI)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	l.Debug("connected")
+
+	dom, err := conn.LookupDomainByName(v.libvirtConfig.Name)
+	if err != nil {
+		return err
+	}
+	defer dom.Free()
+
+	l.Debug("domain found")
+
+	err = dom.Undefine()
+	if err != nil {
+		return err
+	}
+
+	l.Debug("domain undefined")
+
+	return nil
 }
 
 func (v *libvirt) pauseSandbox() error {
