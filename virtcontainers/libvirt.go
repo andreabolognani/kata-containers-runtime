@@ -11,7 +11,12 @@ import (
 
 	persistapi "github.com/kata-containers/runtime/virtcontainers/persist/api"
 	"github.com/kata-containers/runtime/virtcontainers/types"
+	"github.com/kata-containers/runtime/virtcontainers/utils"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	libvirtConsoleSocket = "console.sock"
 )
 
 type libvirt struct {
@@ -103,7 +108,7 @@ func (v *libvirt) getSandboxConsole(id string) (string, error) {
 	l := v.funcLogger("getSandboxConsole")
 	l.WithField("id", id).Debug()
 
-	return "", errors.New("getSandboxConsole() failed")
+	return utils.BuildSocketPath(v.store.RunVMStoragePath(), id, libvirtConsoleSocket)
 }
 
 func (v *libvirt) resizeMemory(reqMemMB uint32, memoryBlockSizeMB uint32, probe bool) (uint32, memoryDevice, error) {
