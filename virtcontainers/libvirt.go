@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/kata-containers/runtime/virtcontainers/device/config"
@@ -69,6 +71,27 @@ func (v *libvirt) capabilities() types.Capabilities {
 func (v *libvirt) hypervisorConfig() HypervisorConfig {
 	v.logger().Info("hypervisorConfig() called")
 	return *v.config
+}
+
+func (v *libvirt) prepareHostFilesystem() error {
+	l := v.funcLogger("prepareHostFilesystem")
+	l.Debug()
+
+	paths := []string{
+		filepath.Join(v.store.RunStoragePath(), v.id),
+		filepath.Join(v.store.RunVMStoragePath(), v.id),
+	}
+
+	for _, path := range paths {
+		err := os.MkdirAll(path, DirMode)
+		if err != nil {
+			return err
+		}
+
+		l.WithField("path", path).Debug("host directory created")
+	}
+
+	return nil
 }
 
 func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS NetworkNamespace, hypervisorConfig *HypervisorConfig, stateful bool) error {
@@ -204,6 +227,11 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 func (v *libvirt) startSandbox(timeout int) error {
 	l := v.funcLogger("startSandbox")
 	l.WithField("timeout", timeout).Debug()
+
+	err := v.prepareHostFilesystem()
+	if err != nil {
+		return err
+	}
 
 	domXML, err := v.libvirtConfig.Marshal()
 	if err != nil {
