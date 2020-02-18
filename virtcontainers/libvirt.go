@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	persistapi "github.com/kata-containers/runtime/virtcontainers/persist/api"
 	"github.com/kata-containers/runtime/virtcontainers/types"
@@ -20,6 +21,26 @@ import (
 const (
 	libvirtConsoleSocket = "console.sock"
 )
+
+var libvirtDefaultKernelParams = []Param{
+	{"quiet", ""},
+	{"tsc", "reliable"},
+	{"no_timer_check", ""},
+	{"rcupdate.rcu_expedited", "1"},
+	{"i8042.direct", "1"},
+	{"i8042.dumbkbd", "1"},
+	{"i8042.nopnp", "1"},
+	{"i8042.noaux", "1"},
+	{"noreplace-smp", ""},
+	{"reboot", "k"},
+	{"console", "hvc0"},
+	{"console", "hvc1"},
+	{"iommu", "off"},
+	{"cryptomgr.notests", ""},
+	{"net.ifnames", "0"},
+	{"pci", "lastbus=0"},
+	{"panic", "1"},
+}
 
 type libvirt struct {
 	id            string
@@ -63,6 +84,13 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 		return err
 	}
 
+	kernelParams := libvirtDefaultKernelParams
+	kernelParams = append(kernelParams, Param{"nr_cpus", fmt.Sprintf("%d", v.config.DefaultMaxVCPUs)})
+	kernelParams = append(kernelParams, Param{"agent.use_vsock", "false"})
+	kernelParams = append(kernelParams, v.config.KernelParams...)
+
+	kernelCmdline := strings.Join(SerializeParams(kernelParams, "="), " ")
+
 	v.libvirtConfig = &virtxml.Domain{
 		Type: "kvm",
 		Name: fmt.Sprintf("sandbox-%s", id),
@@ -79,8 +107,9 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 				Type:    "hvm",
 				Machine: v.config.HypervisorMachineType,
 			},
-			Kernel: v.config.KernelPath,
-			Initrd: v.config.InitrdPath,
+			Kernel:  v.config.KernelPath,
+			Initrd:  v.config.InitrdPath,
+			Cmdline: kernelCmdline,
 		},
 		Features: &virtxml.DomainFeatureList{
 			ACPI: &virtxml.DomainFeature{},
