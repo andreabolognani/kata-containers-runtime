@@ -540,7 +540,51 @@ func (v *libvirt) resizeVCPUs(reqVCPUs uint32) (uint32, uint32, error) {
 	l := v.funcLogger("resizeVCPUs")
 	l.WithField("reqVCPUs", reqVCPUs).Debug()
 
-	return 0, 0, errors.New("resizeVCPUs() failed")
+	maxVCPUs := uint32(v.libvirtConfig.VCPU.Value)
+
+	if reqVCPUs > maxVCPUs {
+		// Can't go beyond the max
+		l.WithField("reqVCPUs", reqVCPUs).WithField("maxVCPUs", maxVCPUs).Warn("Capped vCPUs")
+		reqVCPUs = maxVCPUs
+	}
+
+	err := v.initLibvirt()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	tmp, err := v.libvirtDomain.GetVcpusFlags(virt.DOMAIN_VCPU_LIVE)
+	if err != nil {
+		return 0, 0, err
+	}
+	// Negative values are only returned for errors
+	oldVCPUs := uint32(tmp)
+
+	if oldVCPUs == reqVCPUs {
+		// Nothing to do
+		return oldVCPUs, oldVCPUs, nil
+	}
+
+	err = v.libvirtDomain.SetVcpusFlags(uint(reqVCPUs), virt.DOMAIN_VCPU_LIVE)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	/*
+		for {
+			tmp, err := v.libvirtDomain.GetVcpusFlags(virt.DOMAIN_VCPU_LIVE)
+			if err != nil {
+				return 0, 0, err
+			}
+			currentVCPUs := uint32(tmp)
+			if currentVCPUs == reqVCPUs {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	*/
+
+	return oldVCPUs, reqVCPUs, nil
 }
 
 func (v *libvirt) disconnect() {
