@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kata-containers/runtime/virtcontainers/device/config"
 	persistapi "github.com/kata-containers/runtime/virtcontainers/persist/api"
 	"github.com/kata-containers/runtime/virtcontainers/types"
 	"github.com/kata-containers/runtime/virtcontainers/utils"
@@ -176,6 +177,26 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 		},
 	}
 
+	if v.config.SharedFS == config.VirtioFS {
+		v.libvirtConfig.MemoryBacking = &virtxml.DomainMemoryBacking{
+			MemoryAccess: &virtxml.DomainMemoryAccess{
+				Mode: "shared",
+			},
+		}
+		cellId := uint(0)
+		v.libvirtConfig.CPU.Numa = &virtxml.DomainNuma{
+			Cell: []virtxml.DomainCell{
+				virtxml.DomainCell{
+					ID:        &cellId,
+					CPUs:      fmt.Sprintf("0-%d", v.config.DefaultMaxVCPUs-1),
+					Memory:    fmt.Sprintf("%d", v.config.MemorySize),
+					Unit:      "MiB",
+					MemAccess: "shared",
+				},
+			},
+		}
+	}
+
 	return nil
 }
 
@@ -238,6 +259,11 @@ func (v *libvirt) addDevice(devInfo interface{}, devType deviceType) error {
 			Target: &virtxml.DomainFilesystemTarget{
 				Dir: dev.MountTag,
 			},
+		}
+		if v.config.SharedFS == config.VirtioFS {
+			fs.Driver = &virtxml.DomainFilesystemDriver{
+				Type: "virtiofs",
+			}
 		}
 		v.libvirtConfig.Devices.Filesystems = append(v.libvirtConfig.Devices.Filesystems, *fs)
 	default:
