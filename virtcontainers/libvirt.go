@@ -228,6 +228,18 @@ func (v *libvirt) addDevice(devInfo interface{}, devType deviceType) error {
 			},
 		}
 		v.libvirtConfig.Devices.Channels = append(v.libvirtConfig.Devices.Channels, *sock)
+	case types.Volume:
+		fs := &virtxml.DomainFilesystem{
+			Source: &virtxml.DomainFilesystemSource{
+				Mount: &virtxml.DomainFilesystemSourceMount{
+					Dir: dev.HostPath,
+				},
+			},
+			Target: &virtxml.DomainFilesystemTarget{
+				Dir: dev.MountTag,
+			},
+		}
+		v.libvirtConfig.Devices.Filesystems = append(v.libvirtConfig.Devices.Filesystems, *fs)
 	default:
 		break
 	}
