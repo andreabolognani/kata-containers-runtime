@@ -266,6 +266,23 @@ func (v *libvirt) addDevice(devInfo interface{}, devType deviceType) error {
 			}
 		}
 		v.libvirtConfig.Devices.Filesystems = append(v.libvirtConfig.Devices.Filesystems, *fs)
+	case Endpoint:
+		l.WithField("type", dev.Type()).Debug()
+
+		iface := &virtxml.DomainInterface{
+			Source: &virtxml.DomainInterfaceSource{
+				Bridge: &virtxml.DomainInterfaceSourceBridge{
+					Bridge: "docker0",
+				},
+			},
+			Model: &virtxml.DomainInterfaceModel{
+				Type: "virtio",
+			},
+			MAC: &virtxml.DomainInterfaceMAC{
+				Address: dev.HardwareAddr(),
+			},
+		}
+		v.libvirtConfig.Devices.Interfaces = append(v.libvirtConfig.Devices.Interfaces, *iface)
 	default:
 		break
 	}
