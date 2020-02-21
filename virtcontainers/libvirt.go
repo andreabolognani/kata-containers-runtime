@@ -48,11 +48,14 @@ var libvirtDefaultKernelParams = []Param{
 }
 
 type libvirt struct {
-	id            string
-	store         persistapi.PersistDriver
-	config        *HypervisorConfig
-	libvirtURI    string
-	libvirtConfig *virtxml.Domain
+	id             string
+	store          persistapi.PersistDriver
+	config         *HypervisorConfig
+	libvirtRoot    string
+	libvirtURI     string
+	libvirtConfig  *virtxml.Domain
+	libvirtConnect *virt.Connect
+	libvirtDomain  *virt.Domain
 }
 
 func (v *libvirt) logger() *logrus.Entry {
@@ -73,6 +76,80 @@ func (v *libvirt) hypervisorConfig() HypervisorConfig {
 	return *v.config
 }
 
+func (v *libvirt) initLibvirtConnect() error {
+	l := v.funcLogger("initLibvirtConnect")
+	l.Debug()
+
+	if v.libvirtConnect != nil {
+		l.Debug("connect already exists")
+		return nil
+	}
+
+	err := virt.EventRegisterDefaultImpl()
+	if err != nil {
+		return err
+	}
+
+	l.Debug("event loop registered")
+
+	go func() {
+		for {
+			err := virt.EventRunDefaultImpl()
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
+
+	l.Debug("event loop running")
+
+	v.libvirtConnect, err = virt.NewConnect(v.libvirtURI)
+	if err != nil {
+		return err
+	}
+
+	l.Debug("connected")
+
+	return nil
+}
+
+func (v *libvirt) initLibvirtDomain() error {
+	l := v.funcLogger("initLibvirtDomain")
+	l.Debug()
+
+	if v.libvirtDomain != nil {
+		l.Debug("domain already exists")
+		return nil
+	}
+
+	var err error
+	v.libvirtDomain, err = v.libvirtConnect.LookupDomainByName(v.libvirtConfig.Name)
+	if err != nil {
+		return err
+	}
+
+	l.Debug("domain found")
+
+	return nil
+}
+
+func (v *libvirt) initLibvirt() error {
+	l := v.funcLogger("initLibvirt")
+	l.Debug()
+
+	err := v.initLibvirtConnect()
+	if err != nil {
+		return err
+	}
+
+	err = v.initLibvirtDomain()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (v *libvirt) prepareHostFilesystem() error {
 	l := v.funcLogger("prepareHostFilesystem")
 	l.Debug()
@@ -80,6 +157,7 @@ func (v *libvirt) prepareHostFilesystem() error {
 	paths := []string{
 		filepath.Join(v.store.RunStoragePath(), v.id),
 		filepath.Join(v.store.RunVMStoragePath(), v.id),
+		v.libvirtRoot,
 	}
 
 	for _, path := range paths {
@@ -106,7 +184,8 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 		return err
 	}
 
-	v.libvirtURI = libvirtDefaultURI
+	v.libvirtRoot = filepath.Join(v.store.RunVMStoragePath(), "..", "libvirt")
+	v.libvirtURI = fmt.Sprintf("qemu:///embed?root=%s", v.libvirtRoot)
 
 	consolePath, err := v.getSandboxConsole(id)
 	if err != nil {
@@ -240,15 +319,12 @@ func (v *libvirt) startSandbox(timeout int) error {
 
 	l.WithField("domXML", domXML).Debug()
 
-	conn, err := virt.NewConnect(v.libvirtURI)
+	err = v.initLibvirtConnect()
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
-	l.Debug("connected")
-
-	dom, err := conn.DomainDefineXML(domXML)
+	dom, err := v.libvirtConnect.DomainDefineXML(domXML)
 	if err != nil {
 		return err
 	}
@@ -270,30 +346,19 @@ func (v *libvirt) stopSandbox() error {
 	l := v.funcLogger("stopSandbox")
 	l.Debug()
 
-	conn, err := virt.NewConnect(v.libvirtURI)
+	err := v.initLibvirt()
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
-	l.Debug("connected")
-
-	dom, err := conn.LookupDomainByName(v.libvirtConfig.Name)
-	if err != nil {
-		return err
-	}
-	defer dom.Free()
-
-	l.Debug("domain found")
-
-	err = dom.Destroy()
+	err = v.libvirtDomain.Destroy()
 	if err == nil {
 		l.Debug("domain destroyed")
 	} else {
 		l.Debug("failed to destroy domain")
 	}
 
-	err = dom.Undefine()
+	err = v.libvirtDomain.Undefine()
 	if err != nil {
 		return err
 	}
