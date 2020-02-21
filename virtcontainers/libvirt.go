@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	libvirtDefaultURI    = "qemu:///system"
 	libvirtConsoleSocket = "console.sock"
 )
 
@@ -46,6 +47,7 @@ type libvirt struct {
 	id            string
 	store         persistapi.PersistDriver
 	config        *HypervisorConfig
+	libvirtURI    string
 	libvirtConfig *virtxml.Domain
 }
 
@@ -78,6 +80,8 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 	if err != nil {
 		return err
 	}
+
+	v.libvirtURI = libvirtDefaultURI
 
 	consolePath, err := v.getSandboxConsole(id)
 	if err != nil {
