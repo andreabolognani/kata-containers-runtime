@@ -492,9 +492,11 @@ func (v *libvirt) addDevice(devInfo interface{}, devType deviceType) error {
 
 		iface := &virtxml.DomainInterface{
 			Source: &virtxml.DomainInterfaceSource{
-				Bridge: &virtxml.DomainInterfaceSourceBridge{
-					Bridge: "docker0",
-				},
+				Ethernet: &virtxml.DomainInterfaceSourceEthernet{},
+			},
+			Target: &virtxml.DomainInterfaceTarget{
+				Dev:     dev.NetworkPair().TapInterface.TAPIface.Name,
+				Managed: "no",
 			},
 			Model: &virtxml.DomainInterfaceModel{
 				Type: "virtio",
