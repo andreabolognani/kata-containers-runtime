@@ -156,10 +156,13 @@ func (v *libvirt) prepareHostFilesystem() error {
 	l := v.funcLogger("prepareHostFilesystem")
 	l.Debug()
 
+	libvirtConfDir := filepath.Join(v.libvirtRoot, "etc")
+
 	paths := []string{
 		filepath.Join(v.store.RunStoragePath(), v.id),
 		filepath.Join(v.store.RunVMStoragePath(), v.id),
 		v.libvirtRoot,
+		libvirtConfDir,
 	}
 
 	for _, path := range paths {
@@ -179,6 +182,14 @@ func (v *libvirt) prepareHostFilesystem() error {
 	}
 
 	l.WithField("lnTarget", lnTarget).WithField("lnName", lnName).Debug("symlink created")
+
+	qemuConf, err := os.Create(filepath.Join(libvirtConfDir, "qemu.conf"))
+	if err != nil {
+		return err
+	}
+	defer qemuConf.Close()
+
+	qemuConf.WriteString("stdio_handler = \"file\"\n")
 
 	return nil
 }
