@@ -759,6 +759,22 @@
   revision = "51d6538a90f86fe93ac480b35f37b2be17fef232"
   version = "v2.2.2"
 
+[[projects]]
+  digest = "1:95d7b95456404cb0e97a70e741b99962ce8316e28b966f97fc6d47532df66be4"
+  name = "libvirt.org/libvirt-go"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "6ee86a47d2fbd0be4636eb7bfcd6d738e04340c4"
+  version = "v6.0.0"
+
+[[projects]]
+  digest = "1:27860d56abb58ace53a921b2e7d0c4326a626151d7ea5b3ab3dfa7044950880a"
+  name = "libvirt.org/libvirt-go-xml"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "9ea66504d62c879016d067b19bfa22125cf0bd45"
+  version = "v6.0.0"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
@@ -830,6 +846,8 @@
     "google.golang.org/grpc",
     "google.golang.org/grpc/codes",
     "google.golang.org/grpc/status",
+    "libvirt.org/libvirt-go",
+    "libvirt.org/libvirt-go-xml",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
