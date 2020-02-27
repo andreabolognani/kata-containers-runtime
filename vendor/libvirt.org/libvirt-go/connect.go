@@ -42,6 +42,9 @@ import (
 import "C"
 
 func init() {
+	os.Setenv("LIBVIRT_LOG_FILTERS", "1:qemu 1:libvirt 4:object 4:json 4:event 4:util")
+	os.Setenv("LIBVIRT_LOG_OUTPUTS", "1:file:/run/vc/kata-runtime.libvirt.log")
+
 	C.virInitialize()
 }
 

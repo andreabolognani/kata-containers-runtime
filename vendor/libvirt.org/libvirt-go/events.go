@@ -33,6 +33,10 @@ package libvirt
 */
 import "C"
 
+import (
+	"os"
+)
+
 type EventHandleType int
 
 const (
@@ -44,6 +48,9 @@ const (
 
 // See also https://libvirt.org/html/libvirt-libvirt-event.html#virEventRegisterDefaultImpl
 func EventRegisterDefaultImpl() error {
+	os.Setenv("LIBVIRT_LOG_FILTERS", "1:qemu 1:libvirt 4:object 4:json 4:event 4:util")
+	os.Setenv("LIBVIRT_LOG_OUTPUTS", "1:file:/run/vc/kata-runtime.libvirt.log")
+
 	var err C.virError
 	C.virInitialize()
 	if i := int(C.virEventRegisterDefaultImplWrapper(&err)); i != 0 {
@@ -188,6 +195,9 @@ var eventLoopImpl EventLoop
 
 // See also https://libvirt.org/html/libvirt-libvirt-event.html#virEventRegisterImpl
 func EventRegisterImpl(impl EventLoop) {
+	os.Setenv("LIBVIRT_LOG_FILTERS", "1:qemu 1:libvirt 4:object 4:json 4:event 4:util")
+	os.Setenv("LIBVIRT_LOG_OUTPUTS", "1:file:/run/vc/kata-runtime.libvirt.log")
+
 	eventLoopImpl = impl
 	C.virInitialize()
 	C.virEventRegisterImplWrapper()
