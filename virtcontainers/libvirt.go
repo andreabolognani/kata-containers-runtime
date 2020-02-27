@@ -15,6 +15,7 @@ import (
 
 	"github.com/kata-containers/runtime/virtcontainers/device/config"
 	persistapi "github.com/kata-containers/runtime/virtcontainers/persist/api"
+	"github.com/kata-containers/runtime/virtcontainers/pkg/uuid"
 	"github.com/kata-containers/runtime/virtcontainers/types"
 	"github.com/kata-containers/runtime/virtcontainers/utils"
 	"github.com/sirupsen/logrus"
@@ -51,6 +52,7 @@ type libvirt struct {
 	id             string
 	store          persistapi.PersistDriver
 	config         *HypervisorConfig
+	libvirtUUID    string
 	libvirtRoot    string
 	libvirtURI     string
 	libvirtConfig  *virtxml.Domain
@@ -172,6 +174,17 @@ func (v *libvirt) prepareHostFilesystem() error {
 	return nil
 }
 
+func uuidRemoveDashes(uuid string) string {
+	chunks := []string{
+		uuid[0:8],
+		uuid[9:13],
+		uuid[14:18],
+		uuid[19:23],
+		uuid[24:],
+	}
+	return strings.Join(chunks, "")
+}
+
 func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS NetworkNamespace, hypervisorConfig *HypervisorConfig, stateful bool) error {
 	l := v.funcLogger("createSandbox")
 	l.WithField("ctx", ctx).WithField("id", id).WithField("networkNS", networkNS).WithField("hypervisorConfig", hypervisorConfig).WithField("stateful", stateful).Debug()
@@ -184,7 +197,8 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 		return err
 	}
 
-	v.libvirtRoot = filepath.Join(v.store.RunVMStoragePath(), "..", "libvirt")
+	v.libvirtUUID = uuid.Generate().String()
+	v.libvirtRoot = filepath.Join(v.store.RunVMStoragePath(), "..", "libvirt", uuidRemoveDashes(v.libvirtUUID))
 	v.libvirtURI = fmt.Sprintf("qemu:///embed?root=%s", v.libvirtRoot)
 
 	consolePath, err := v.getSandboxConsole(id)
@@ -201,6 +215,7 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 
 	v.libvirtConfig = &virtxml.Domain{
 		Type: "kvm",
+		UUID: v.libvirtUUID,
 		Name: fmt.Sprintf("sandbox-%s", id),
 		VCPU: &virtxml.DomainVCPU{
 			Current: fmt.Sprintf("%d", v.config.NumVCPUs),
