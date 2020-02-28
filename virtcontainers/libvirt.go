@@ -163,7 +163,7 @@ func (v *libvirt) prepareHostFilesystem() error {
 	}
 
 	for _, path := range paths {
-		err := os.MkdirAll(path, DirMode)
+		err := os.MkdirAll(path, os.FileMode(0755)|os.ModeDir)
 		if err != nil {
 			return err
 		}
