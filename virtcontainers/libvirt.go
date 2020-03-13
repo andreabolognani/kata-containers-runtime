@@ -171,6 +171,15 @@ func (v *libvirt) prepareHostFilesystem() error {
 		l.WithField("path", path).Debug("host directory created")
 	}
 
+	lnTarget := v.libvirtRoot
+	lnName := filepath.Join(v.store.RunVMStoragePath(), v.id, "libvirt")
+	err := os.Symlink(lnTarget, lnName)
+	if err != nil {
+		return err
+	}
+
+	l.WithField("lnTarget", lnTarget).WithField("lnName", lnName).Debug("symlink created")
+
 	return nil
 }
 
@@ -185,6 +194,17 @@ func uuidRemoveDashes(uuid string) string {
 	return strings.Join(chunks, "")
 }
 
+func uuidAddDashes(uuid string) string {
+	chunks := []string{
+		uuid[0:8],
+		uuid[8:12],
+		uuid[12:16],
+		uuid[16:20],
+		uuid[20:],
+	}
+	return strings.Join(chunks, "-")
+}
+
 func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS NetworkNamespace, hypervisorConfig *HypervisorConfig, stateful bool) error {
 	l := v.funcLogger("createSandbox")
 	l.WithField("ctx", ctx).WithField("id", id).WithField("networkNS", networkNS).WithField("hypervisorConfig", hypervisorConfig).WithField("stateful", stateful).Debug()
@@ -197,8 +217,29 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 		return err
 	}
 
-	v.libvirtUUID = uuid.Generate().String()
-	v.libvirtRoot = filepath.Join(v.store.RunVMStoragePath(), "..", "libvirt", uuidRemoveDashes(v.libvirtUUID))
+	// If this symlink exists, it will point to the libvirtRoot we have
+	// created earlier; it not existing is not an error
+	rootLink := filepath.Join(v.store.RunVMStoragePath(), v.id, "libvirt")
+	_, err = os.Stat(rootLink)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if err == nil {
+		// The symlink exists: it will point to the previously created
+		// libvirtRoot, whose last element is the libvirtUUID
+		v.libvirtRoot, err = os.Readlink(rootLink)
+		if err != nil {
+			return err
+		}
+		v.libvirtUUID = uuidAddDashes(filepath.Base(v.libvirtRoot))
+	} else {
+		// The symlink doesn't exist: generate a fresh libvirtUUID and
+		// derive libvirtRoot from it
+		v.libvirtUUID = uuid.Generate().String()
+		v.libvirtRoot = filepath.Join(v.store.RunVMStoragePath(), "..", "libvirt", uuidRemoveDashes(v.libvirtUUID))
+	}
+
 	v.libvirtURI = fmt.Sprintf("qemu:///embed?root=%s", v.libvirtRoot)
 
 	consolePath, err := v.getSandboxConsole(id)
