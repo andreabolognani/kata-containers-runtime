@@ -35,7 +35,7 @@ func (v *libvirt) capabilities() types.Capabilities {
 
 func (v *libvirt) hypervisorConfig() HypervisorConfig {
 	v.logger().Info("hypervisorConfig() called")
-	return HypervisorConfig{}
+	return *v.config
 }
 
 func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS NetworkNamespace, hypervisorConfig *HypervisorConfig, stateful bool) error {
