@@ -268,7 +268,7 @@ func (v *libvirt) createSandbox(ctx context.Context, id string, networkNS Networ
 	v.libvirtConfig = &virtxml.Domain{
 		Type: "kvm",
 		UUID: v.libvirtUUID,
-		Name: fmt.Sprintf("sandbox-%s", id),
+		Name: "sandbox",
 		VCPU: &virtxml.DomainVCPU{
 			Current: fmt.Sprintf("%d", v.config.NumVCPUs),
 			Value:   int(v.config.DefaultMaxVCPUs),
