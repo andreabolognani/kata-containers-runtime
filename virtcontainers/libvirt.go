@@ -70,7 +70,12 @@ func (v *libvirt) funcLogger(funcName string) *logrus.Entry {
 
 func (v *libvirt) capabilities() types.Capabilities {
 	v.logger().Info("capabilities() called")
-	return types.Capabilities{}
+
+	var caps types.Capabilities
+
+	caps.SetFsSharingSupport()
+
+	return caps
 }
 
 func (v *libvirt) hypervisorConfig() HypervisorConfig {
